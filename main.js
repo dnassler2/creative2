@@ -1,5 +1,5 @@
 (() => {
-  const CHARS = 'XxYyZz/\\.-_=+[]<>';
+  const CHARS = '01/\\.-_=+[]<>^*(){}:;!';
   const SPACE_PROBABILITY = 0.14;
   const TICK_INTERVAL_MS = 90;
   const MUTATE_RATIO = 0.12;
