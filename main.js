@@ -1,5 +1,7 @@
 (() => {
-  const CHARS = '0123456789XYVWABCDEF/\\.-_=+[]<>^*(){}:;!';
+  const DEFAULT_CHARS = '0123456789xyztfXYZVWABCDEF/\\.-_=+[]<>^*(){}:;!';
+  const MIN_CHAR_SET_SIZE = 3;
+  const MAX_CHAR_SET_SIZE = 20;
   const SPACE_PROBABILITY = 0.14;
   const TICK_INTERVAL_MS = 90;
   const MUTATE_RATIO = 0.12;
@@ -10,21 +12,40 @@
 
   const stage = document.getElementById('stage');
   let cells = [];
+  let currentChars = DEFAULT_CHARS;
+  const charHistory = [];
   let isPaused = false;
   let zoom = 1;
   let lastTick = 0;
   let resizeTimer = null;
 
   /**
-   * Pick a random character from the palette or an occasional space.
+   * Pick a random character from the active palette or an occasional space.
    * @returns {string}
    */
   function randomChar() {
     if (Math.random() < SPACE_PROBABILITY) {
       return ' ';
     }
-    const index = Math.floor(Math.random() * CHARS.length);
-    return CHARS[index];
+    const index = Math.floor(Math.random() * currentChars.length);
+    return currentChars[index];
+  }
+
+  /**
+   * Generate a random subset of characters from DEFAULT_CHARS.
+   * @returns {string}
+   */
+  function generateRandomCharSet() {
+    const pool = DEFAULT_CHARS.split('');
+    for (let i = pool.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const maxSize = Math.min(pool.length, MAX_CHAR_SET_SIZE);
+    const size =
+      MIN_CHAR_SET_SIZE +
+      Math.floor(Math.random() * (maxSize - MIN_CHAR_SET_SIZE + 1));
+    return pool.slice(0, size).join('');
   }
 
   /**
@@ -134,6 +155,15 @@
       isPaused = !isPaused;
     } else if (event.key === 'r' || event.key === 'R') {
       randomizeAll();
+    } else if (event.key === 'j' || event.key === 'J') {
+      charHistory.push(currentChars);
+      currentChars = generateRandomCharSet();
+      randomizeAll();
+    } else if (event.key === 'k' || event.key === 'K') {
+      if (charHistory.length > 0) {
+        currentChars = charHistory.pop();
+        randomizeAll();
+      }
     } else if (event.key === '+' || event.key === '=') {
       event.preventDefault();
       adjustZoom(ZOOM_STEP);
