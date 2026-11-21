@@ -14,6 +14,7 @@
   let cells = [];
   let currentChars = DEFAULT_CHARS;
   const charHistory = [];
+  const savedPresets = new Map();
   let isPaused = false;
   let zoom = 1;
   let lastTick = 0;
@@ -131,15 +132,58 @@
   }
 
   /**
+   * Set the stage zoom level, clamping to [MIN_ZOOM, MAX_ZOOM].
+   * @param {number} targetZoom
+   * @returns {boolean} Whether the zoom level changed.
+   */
+  function setZoom(targetZoom) {
+    const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, targetZoom));
+    if (nextZoom === zoom) return false;
+    zoom = nextZoom;
+    stage.style.setProperty('--zoom', String(zoom));
+    return true;
+  }
+
+  /**
    * Adjust the stage zoom level and rebuild the grid.
    * @param {number} factor
    */
   function adjustZoom(factor) {
-    const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * factor));
-    if (nextZoom === zoom) return;
-    zoom = nextZoom;
-    stage.style.setProperty('--zoom', String(zoom));
-    buildGrid();
+    if (setZoom(zoom * factor)) {
+      buildGrid();
+    }
+  }
+
+  /**
+   * Extract a '0'-'9' slot key from a KeyboardEvent, handling Shift+digit.
+   * @param {KeyboardEvent} event
+   * @returns {string | null}
+   */
+  function getDigitSlot(event) {
+    const codeMatch = /^(?:Digit|Numpad)([0-9])$/.exec(event.code);
+    if (codeMatch) return codeMatch[1];
+    if (/^[0-9]$/.test(event.key)) return event.key;
+    return null;
+  }
+
+  /**
+   * Save or restore the zoom level and character set for a numbered slot.
+   * @param {string} slot
+   * @param {boolean} forceSave
+   */
+  function handlePresetKey(slot, forceSave) {
+    if (forceSave || !savedPresets.has(slot)) {
+      savedPresets.set(slot, { zoom, chars: currentChars });
+      return;
+    }
+
+    const preset = savedPresets.get(slot);
+    currentChars = preset.chars;
+    if (setZoom(preset.zoom)) {
+      buildGrid();
+    } else {
+      randomizeAll();
+    }
   }
 
   window.addEventListener('resize', () => {
@@ -170,6 +214,12 @@
     } else if (event.key === '-' || event.key === '_') {
       event.preventDefault();
       adjustZoom(1 / ZOOM_STEP);
+    } else {
+      const slot = getDigitSlot(event);
+      if (slot !== null) {
+        event.preventDefault();
+        handlePresetKey(slot, event.shiftKey);
+      }
     }
   });
 
