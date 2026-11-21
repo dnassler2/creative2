@@ -3,7 +3,9 @@
   const MIN_CHAR_SET_SIZE = 3;
   const MAX_CHAR_SET_SIZE = 20;
   const SPACE_PROBABILITY = 0.14;
-  const TICK_INTERVAL_MS = 90;
+  const DEFAULT_TICK_INTERVAL_MS = 90;
+  const MIN_TICK_INTERVAL_MS = 5;
+  const MAX_TICK_INTERVAL_MS = 5000;
   const MUTATE_RATIO = 0.12;
   const RESIZE_DEBOUNCE_MS = 120;
   const ZOOM_STEP = 1.15;
@@ -18,6 +20,7 @@
   const savedPresets = new Map();
   let isPaused = false;
   let zoom = 1;
+  let tickIntervalMs = DEFAULT_TICK_INTERVAL_MS;
   let lastTick = 0;
   let resizeTimer = null;
 
@@ -121,15 +124,26 @@
   }
 
   /**
-   * Main animation loop throttled by TICK_INTERVAL_MS.
+   * Main animation loop throttled by tickIntervalMs.
    * @param {number} timestamp
    */
   function animate(timestamp) {
-    if (!isPaused && timestamp - lastTick >= TICK_INTERVAL_MS) {
+    if (!isPaused && timestamp - lastTick >= tickIntervalMs) {
       scrambleStep();
       lastTick = timestamp;
     }
     requestAnimationFrame(animate);
+  }
+
+  /**
+   * Scale the tick interval by multiplier, clamped to [MIN_TICK_INTERVAL_MS, MAX_TICK_INTERVAL_MS].
+   * @param {number} multiplier
+   */
+  function adjustTickInterval(multiplier) {
+    tickIntervalMs = Math.min(
+      MAX_TICK_INTERVAL_MS,
+      Math.max(MIN_TICK_INTERVAL_MS, tickIntervalMs * multiplier)
+    );
   }
 
   /**
@@ -238,6 +252,10 @@
     } else if (event.key === '-' || event.key === '_') {
       event.preventDefault();
       adjustZoom(1 / ZOOM_STEP);
+    } else if (event.key === '[') {
+      adjustTickInterval(2);
+    } else if (event.key === ']') {
+      adjustTickInterval(0.5);
     } else if (event.key === 'z') {
       randomizePresets(false);
     } else if (event.key === 'Z') {
