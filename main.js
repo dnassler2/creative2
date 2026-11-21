@@ -9,6 +9,7 @@
   const ZOOM_STEP = 1.15;
   const MIN_ZOOM = 0.2;
   const MAX_ZOOM = 4;
+  const PRESET_SLOTS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
   const stage = document.getElementById('stage');
   let cells = [];
@@ -186,6 +187,29 @@
     }
   }
 
+  /**
+   * Generate a random zoom level distributed log-uniformly between MIN_ZOOM and MAX_ZOOM.
+   * @returns {number}
+   */
+  function randomZoom() {
+    return MIN_ZOOM * Math.pow(MAX_ZOOM / MIN_ZOOM, Math.random());
+  }
+
+  /**
+   * Randomize all numbered presets.
+   * @param {boolean} includeChars Whether to also randomize each preset's character set.
+   */
+  function randomizePresets(includeChars) {
+    for (const slot of PRESET_SLOTS) {
+      const existing = savedPresets.get(slot);
+      savedPresets.set(slot, {
+        zoom: randomZoom(),
+        chars:
+          includeChars || !existing ? generateRandomCharSet() : existing.chars,
+      });
+    }
+  }
+
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(buildGrid, RESIZE_DEBOUNCE_MS);
@@ -214,6 +238,10 @@
     } else if (event.key === '-' || event.key === '_') {
       event.preventDefault();
       adjustZoom(1 / ZOOM_STEP);
+    } else if (event.key === 'z') {
+      randomizePresets(false);
+    } else if (event.key === 'Z') {
+      randomizePresets(true);
     } else {
       const slot = getDigitSlot(event);
       if (slot !== null) {
@@ -223,6 +251,7 @@
     }
   });
 
+  randomizePresets(true);
   buildGrid();
   requestAnimationFrame(animate);
 })();
