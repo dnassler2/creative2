@@ -24,7 +24,7 @@ body {
   height: 100vh;
   align-content: center;
   justify-content: center;
-  font-size: clamp(4rem, 13vw, 18rem);
+  font-size: calc(clamp(4rem, 13vw, 18rem) * var(--zoom, 1));
   line-height: 1.05;
   font-weight: 400;
 }

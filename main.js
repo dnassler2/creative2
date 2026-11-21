@@ -4,10 +4,14 @@
   const TICK_INTERVAL_MS = 90;
   const MUTATE_RATIO = 0.12;
   const RESIZE_DEBOUNCE_MS = 120;
+  const ZOOM_STEP = 1.15;
+  const MIN_ZOOM = 0.2;
+  const MAX_ZOOM = 4;
 
   const stage = document.getElementById('stage');
   let cells = [];
   let isPaused = false;
+  let zoom = 1;
   let lastTick = 0;
   let resizeTimer = null;
 
@@ -105,17 +109,37 @@
     requestAnimationFrame(animate);
   }
 
+  /**
+   * Adjust the stage zoom level and rebuild the grid.
+   * @param {number} factor
+   */
+  function adjustZoom(factor) {
+    const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * factor));
+    if (nextZoom === zoom) return;
+    zoom = nextZoom;
+    stage.style.setProperty('--zoom', String(zoom));
+    buildGrid();
+  }
+
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(buildGrid, RESIZE_DEBOUNCE_MS);
   });
 
   window.addEventListener('keydown', (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+
     if (event.code === 'Space') {
       event.preventDefault();
       isPaused = !isPaused;
     } else if (event.key === 'r' || event.key === 'R') {
       randomizeAll();
+    } else if (event.key === '+' || event.key === '=') {
+      event.preventDefault();
+      adjustZoom(ZOOM_STEP);
+    } else if (event.key === '-' || event.key === '_') {
+      event.preventDefault();
+      adjustZoom(1 / ZOOM_STEP);
     }
   });
 
