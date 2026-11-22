@@ -35,3 +35,8 @@ body {
   justify-content: center;
   white-space: pre;
 }
+
+body.hide-cursor,
+body.hide-cursor * {
+  cursor: none;
+}

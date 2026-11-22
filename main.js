@@ -15,6 +15,7 @@
   const AUTO_ZOOM_DELTAS = [0, 1, -1, 2, -2];
   const AUTO_CHARSET_PROBABILITY = 0.7;
   const AUTO_RANDOMIZE_PROBABILITY = 0.35;
+  const CURSOR_IDLE_MS = 2000;
   const PRESET_SLOTS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
   const stage = document.getElementById('stage');
@@ -31,6 +32,7 @@
   let lastTick = 0;
   let lastAutoStep = 0;
   let resizeTimer = null;
+  let cursorTimer = null;
 
   /**
    * Pick a random character from the active palette or an occasional space.
@@ -298,10 +300,25 @@
     }
   }
 
+  /**
+   * Show the cursor and hide it again after CURSOR_IDLE_MS of inactivity.
+   */
+  function resetCursorTimer() {
+    document.body.classList.remove('hide-cursor');
+    clearTimeout(cursorTimer);
+    cursorTimer = setTimeout(() => {
+      document.body.classList.add('hide-cursor');
+    }, CURSOR_IDLE_MS);
+  }
+
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(buildGrid, RESIZE_DEBOUNCE_MS);
   });
+
+  window.addEventListener('mousemove', resetCursorTimer);
+  window.addEventListener('mousedown', resetCursorTimer);
+  window.addEventListener('wheel', resetCursorTimer, { passive: true });
 
   window.addEventListener('keydown', (event) => {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -356,5 +373,6 @@
 
   randomizePresets(true);
   buildGrid();
+  resetCursorTimer();
   requestAnimationFrame(animate);
 })();
