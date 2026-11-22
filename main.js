@@ -1,5 +1,5 @@
 (() => {
-  const DEFAULT_CHARS = '0123456789xyztfXYZVWABCDEF/\\.-_=+[]<>^*(){}:;!';
+  const DEFAULT_CHARS = '0123456789012345678901234567890123456789012345678901234567890123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/\\.-_=+[]<>^*(){}:;!/\\.-_=+[]<>^*(){}:;!/\\.-_=+[]<>^*(){}:;!/\\.-_=+[]<>^*(){}:;!/\\.-_=+[]<>^*(){}:;!';
   const MIN_CHAR_SET_SIZE = 3;
   const MAX_CHAR_SET_SIZE = 20;
   const SPACE_PROBABILITY = 0.14;
