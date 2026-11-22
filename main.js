@@ -362,6 +362,16 @@
       adjustBuffer('y', 1);
     } else if (event.key === 'n') {
       adjustBuffer('y', -1);
+    } else if (event.key === 'p' || event.key === 'P') {
+      console.log({
+        currentChars,
+        zoom,
+        bufferCols,
+        bufferRows,
+        tickIntervalMs,
+        isPaused,
+        isAutoMode,
+      });
     } else {
       const slot = getDigitSlot(event);
       if (slot !== null) {
