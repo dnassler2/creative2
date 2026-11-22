@@ -11,6 +11,10 @@
   const ZOOM_STEP = 1.15;
   const MIN_ZOOM = 0.2;
   const MAX_ZOOM = 4;
+  const AUTO_INTERVAL_MS = 2800;
+  const AUTO_ZOOM_DELTAS = [0, 1, -1, 2, -2];
+  const AUTO_CHARSET_PROBABILITY = 0.7;
+  const AUTO_RANDOMIZE_PROBABILITY = 0.35;
   const PRESET_SLOTS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
   const stage = document.getElementById('stage');
@@ -19,9 +23,13 @@
   const charHistory = [];
   const savedPresets = new Map();
   let isPaused = false;
+  let isAutoMode = false;
   let zoom = 1;
+  let bufferCols = 0;
+  let bufferRows = 0;
   let tickIntervalMs = DEFAULT_TICK_INTERVAL_MS;
   let lastTick = 0;
+  let lastAutoStep = 0;
   let resizeTimer = null;
 
   /**
@@ -80,8 +88,10 @@
   function buildGrid() {
     stage.innerHTML = '';
     const { width, height } = measureCell();
-    const cols = Math.max(1, Math.floor(window.innerWidth / width));
-    const rows = Math.max(1, Math.floor(window.innerHeight / height));
+    const maxCols = Math.max(1, Math.floor(window.innerWidth / width));
+    const maxRows = Math.max(1, Math.floor(window.innerHeight / height));
+    const cols = Math.max(1, maxCols - 2 * bufferCols);
+    const rows = Math.max(1, maxRows - 2 * bufferRows);
     const total = cols * rows;
 
     stage.style.gridTemplateColumns = `repeat(${cols}, ${width}px)`;
@@ -124,13 +134,54 @@
   }
 
   /**
+   * Switch to a new random character set, saving the previous one in history.
+   * @param {boolean} [shouldRandomize=true] Whether to immediately randomize all cells.
+   */
+  function nextCharSet(shouldRandomize = true) {
+    charHistory.push(currentChars);
+    currentChars = generateRandomCharSet();
+    if (shouldRandomize) {
+      randomizeAll();
+    }
+  }
+
+  /**
+   * Perform one automatic parameter-drift step for meditative auto mode.
+   */
+  function autoStep() {
+    const zoomDelta =
+      AUTO_ZOOM_DELTAS[Math.floor(Math.random() * AUTO_ZOOM_DELTAS.length)];
+    const changeChars = Math.random() < AUTO_CHARSET_PROBABILITY;
+    const shouldRandomize = Math.random() < AUTO_RANDOMIZE_PROBABILITY;
+
+    if (changeChars) {
+      nextCharSet(false);
+    }
+
+    const zoomChanged =
+      zoomDelta !== 0 && setZoom(zoom * Math.pow(ZOOM_STEP, zoomDelta));
+
+    if (zoomChanged) {
+      buildGrid();
+    } else if (changeChars || shouldRandomize) {
+      randomizeAll();
+    }
+  }
+
+  /**
    * Main animation loop throttled by tickIntervalMs.
    * @param {number} timestamp
    */
   function animate(timestamp) {
-    if (!isPaused && timestamp - lastTick >= tickIntervalMs) {
-      scrambleStep();
-      lastTick = timestamp;
+    if (!isPaused) {
+      if (timestamp - lastTick >= tickIntervalMs) {
+        scrambleStep();
+        lastTick = timestamp;
+      }
+      if (isAutoMode && timestamp - lastAutoStep >= AUTO_INTERVAL_MS) {
+        autoStep();
+        lastAutoStep = timestamp;
+      }
     }
     requestAnimationFrame(animate);
   }
@@ -167,6 +218,29 @@
     if (setZoom(zoom * factor)) {
       buildGrid();
     }
+  }
+
+  /**
+   * Adjust the edge buffer (in character column/row increments) and rebuild the grid.
+   * @param {'x' | 'y'} axis
+   * @param {number} delta
+   */
+  function adjustBuffer(axis, delta) {
+    const { width, height } = measureCell();
+    if (axis === 'x') {
+      const maxCols = Math.max(1, Math.floor(window.innerWidth / width));
+      const maxBuffer = Math.max(0, Math.floor((maxCols - 1) / 2));
+      const next = Math.min(maxBuffer, Math.max(0, bufferCols + delta));
+      if (next === bufferCols) return;
+      bufferCols = next;
+    } else {
+      const maxRows = Math.max(1, Math.floor(window.innerHeight / height));
+      const maxBuffer = Math.max(0, Math.floor((maxRows - 1) / 2));
+      const next = Math.min(maxBuffer, Math.max(0, bufferRows + delta));
+      if (next === bufferRows) return;
+      bufferRows = next;
+    }
+    buildGrid();
   }
 
   /**
@@ -235,12 +309,15 @@
     if (event.code === 'Space') {
       event.preventDefault();
       isPaused = !isPaused;
+    } else if (event.key === 'a' || event.key === 'A') {
+      isAutoMode = !isAutoMode;
+      if (isAutoMode) {
+        lastAutoStep = 0;
+      }
     } else if (event.key === 'r' || event.key === 'R') {
       randomizeAll();
     } else if (event.key === 'j' || event.key === 'J') {
-      charHistory.push(currentChars);
-      currentChars = generateRandomCharSet();
-      randomizeAll();
+      nextCharSet();
     } else if (event.key === 'k' || event.key === 'K') {
       if (charHistory.length > 0) {
         currentChars = charHistory.pop();
@@ -260,6 +337,14 @@
       randomizePresets(false);
     } else if (event.key === 'Z') {
       randomizePresets(true);
+    } else if (event.key === 'B') {
+      adjustBuffer('x', 1);
+    } else if (event.key === 'b') {
+      adjustBuffer('x', -1);
+    } else if (event.key === 'N') {
+      adjustBuffer('y', 1);
+    } else if (event.key === 'n') {
+      adjustBuffer('y', -1);
     } else {
       const slot = getDigitSlot(event);
       if (slot !== null) {
