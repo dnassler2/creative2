@@ -331,8 +331,14 @@
       if (isAutoMode) {
         lastAutoStep = 0;
       }
-    } else if (event.key === 'r' || event.key === 'R') {
+    } else if (event.key === 'r') {
       randomizeAll();
+    } else if (event.key === 'R') {
+      if (setZoom(randomZoom())) {
+        buildGrid();
+      } else {
+        randomizeAll();
+      }
     } else if (event.key === 'j' || event.key === 'J') {
       nextCharSet();
     } else if (event.key === 'k' || event.key === 'K') {
