@@ -200,7 +200,7 @@
   }
 
   /**
-   * Set the stage zoom level, clamping to [MIN_ZOOM, MAX_ZOOM].
+   * Set the stage zoom level, clamping to [MIN_ZOOM, MAX_ZOOM], and reset edge buffers on change.
    * @param {number} targetZoom
    * @returns {boolean} Whether the zoom level changed.
    */
@@ -208,6 +208,8 @@
     const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, targetZoom));
     if (nextZoom === zoom) return false;
     zoom = nextZoom;
+    bufferCols = 0;
+    bufferRows = 0;
     stage.style.setProperty('--zoom', String(zoom));
     return true;
   }
