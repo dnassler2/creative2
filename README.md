@@ -12,3 +12,4 @@ Random text updating periodically
 - SHIFT + N will save some of the current state (charset, zoom) as a new preset, under the number N. This will overwrite the previous preset N.
 - z or Z will randomize the presets 0-9 either only the charsets (z) or the charsets and the zoom factors (SHIFT + Z)
 - a will allow automation of some state (charsets, zoom) to change periodically
+- s saves the current screen as a PNG image

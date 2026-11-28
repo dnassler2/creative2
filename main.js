@@ -15,6 +15,8 @@
   const AUTO_ZOOM_DELTAS = [0, 1, -1, 2, -2];
   const AUTO_CHARSET_PROBABILITY = 0.7;
   const AUTO_RANDOMIZE_PROBABILITY = 0.35;
+  const MIN_RANDOM_BUFFER_GRID_SIZE = 5;
+  const RANDOM_BUFFER_PROBABILITY = 0.35;
   const CURSOR_IDLE_MS = 2000;
   const PRESET_SLOTS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
@@ -24,7 +26,7 @@
   const charHistory = [];
   const savedPresets = new Map();
   let isPaused = false;
-  let isAutoMode = false;
+  let isAutoMode = true;
   let zoom = 1;
   let bufferCols = 0;
   let bufferRows = 0;
@@ -85,13 +87,47 @@
   }
 
   /**
+   * Compute the maximum number of columns and rows that fit in the current viewport.
+   * @returns {{ width: number, height: number, maxCols: number, maxRows: number }}
+   */
+  function getGridMetrics() {
+    const { width, height } = measureCell();
+    const maxCols = Math.max(1, Math.floor(window.innerWidth / width));
+    const maxRows = Math.max(1, Math.floor(window.innerHeight / height));
+    return { width, height, maxCols, maxRows };
+  }
+
+  /**
+   * Pick a random edge buffer for one axis if the grid has more than MIN_RANDOM_BUFFER_GRID_SIZE cells.
+   * @param {number} maxCells
+   * @returns {number}
+   */
+  function randomBufferForAxis(maxCells) {
+    if (
+      maxCells <= MIN_RANDOM_BUFFER_GRID_SIZE ||
+      Math.random() >= RANDOM_BUFFER_PROBABILITY
+    ) {
+      return 0;
+    }
+    const maxRandomBuffer = Math.max(1, Math.floor(maxCells / 4));
+    return 1 + Math.floor(Math.random() * maxRandomBuffer);
+  }
+
+  /**
+   * Randomly assign horizontal and/or vertical edge buffers when the grid is large enough.
+   */
+  function randomizeBuffers() {
+    const { maxCols, maxRows } = getGridMetrics();
+    bufferCols = randomBufferForAxis(maxCols);
+    bufferRows = randomBufferForAxis(maxRows);
+  }
+
+  /**
    * Build or rebuild the character grid to fill the current viewport.
    */
   function buildGrid() {
     stage.innerHTML = '';
-    const { width, height } = measureCell();
-    const maxCols = Math.max(1, Math.floor(window.innerWidth / width));
-    const maxRows = Math.max(1, Math.floor(window.innerHeight / height));
+    const { width, height, maxCols, maxRows } = getGridMetrics();
     const cols = Math.max(1, maxCols - 2 * bufferCols);
     const rows = Math.max(1, maxRows - 2 * bufferRows);
     const total = cols * rows;
@@ -143,7 +179,8 @@
     charHistory.push(currentChars);
     currentChars = generateRandomCharSet();
     if (shouldRandomize) {
-      randomizeAll();
+      randomizeBuffers();
+      buildGrid();
     }
   }
 
@@ -163,9 +200,10 @@
     const zoomChanged =
       zoomDelta !== 0 && setZoom(zoom * Math.pow(ZOOM_STEP, zoomDelta));
 
-    if (zoomChanged) {
+    if (zoomChanged || changeChars) {
+      randomizeBuffers();
       buildGrid();
-    } else if (changeChars || shouldRandomize) {
+    } else if (shouldRandomize) {
       randomizeAll();
     }
   }
@@ -230,15 +268,13 @@
    * @param {number} delta
    */
   function adjustBuffer(axis, delta) {
-    const { width, height } = measureCell();
+    const { maxCols, maxRows } = getGridMetrics();
     if (axis === 'x') {
-      const maxCols = Math.max(1, Math.floor(window.innerWidth / width));
       const maxBuffer = Math.max(0, Math.floor((maxCols - 1) / 2));
       const next = Math.min(maxBuffer, Math.max(0, bufferCols + delta));
       if (next === bufferCols) return;
       bufferCols = next;
     } else {
-      const maxRows = Math.max(1, Math.floor(window.innerHeight / height));
       const maxBuffer = Math.max(0, Math.floor((maxRows - 1) / 2));
       const next = Math.min(maxBuffer, Math.max(0, bufferRows + delta));
       if (next === bufferRows) return;
@@ -266,17 +302,32 @@
    */
   function handlePresetKey(slot, forceSave) {
     if (forceSave || !savedPresets.has(slot)) {
-      savedPresets.set(slot, { zoom, chars: currentChars });
+      savedPresets.set(slot, {
+        zoom,
+        chars: currentChars,
+        bufferCols,
+        bufferRows,
+      });
       return;
     }
 
     const preset = savedPresets.get(slot);
     currentChars = preset.chars;
-    if (setZoom(preset.zoom)) {
-      buildGrid();
+    setZoom(preset.zoom);
+    if (preset.bufferCols !== undefined && preset.bufferRows !== undefined) {
+      const { maxCols, maxRows } = getGridMetrics();
+      bufferCols = Math.min(
+        Math.max(0, Math.floor((maxCols - 1) / 2)),
+        preset.bufferCols
+      );
+      bufferRows = Math.min(
+        Math.max(0, Math.floor((maxRows - 1) / 2)),
+        preset.bufferRows
+      );
     } else {
-      randomizeAll();
+      randomizeBuffers();
     }
+    buildGrid();
   }
 
   /**
@@ -300,6 +351,52 @@
           includeChars || !existing ? generateRandomCharSet() : existing.chars,
       });
     }
+  }
+
+  /**
+   * Render the current stage to an offscreen canvas and download it as a PNG.
+   */
+  function saveScreen() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+
+    const bodyStyle = getComputedStyle(document.body);
+    const stageStyle = getComputedStyle(stage);
+
+    ctx.fillStyle = bodyStyle.backgroundColor || '#000000';
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = bodyStyle.color || '#ffffff';
+    ctx.font = `${stageStyle.fontWeight} ${stageStyle.fontSize} ${stageStyle.fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let i = 0; i < cells.length; i += 1) {
+      const cell = cells[i];
+      const ch = cell.textContent;
+      if (!ch || ch === ' ') continue;
+      const rect = cell.getBoundingClientRect();
+      ctx.fillText(ch, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    }
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      link.href = url;
+      link.download = `character-scramble-${timestamp}.png`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
   }
 
   /**
@@ -337,6 +434,7 @@
       randomizeAll();
     } else if (event.key === 'R') {
       if (setZoom(randomZoom())) {
+        randomizeBuffers();
         buildGrid();
       } else {
         randomizeAll();
@@ -370,6 +468,8 @@
       adjustBuffer('y', 1);
     } else if (event.key === 'n') {
       adjustBuffer('y', -1);
+    } else if (event.key === 's' || event.key === 'S') {
+      saveScreen();
     } else if (event.key === 'p' || event.key === 'P') {
       console.log({
         currentChars,
